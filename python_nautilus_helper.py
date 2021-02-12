@@ -43,17 +43,31 @@ class EntryWindow(Gtk.Window):
         self.entries = []
         file_parameters = []  # collect them, later check if there is exactly one
         row_index = 0
-        for _key_param_name, parameter in inspect.signature(method).parameters.items():
+        for parameter in inspect.signature(method).parameters.values():
             if parameter.name in PATH_PARAMETERS:
                 file_parameters.append(parameter.name)
             else:
-                label = Gtk.Label(label=parameter.name, halign=Gtk.Align.END)
+                parameter_type = parameter.annotation
+                if parameter_type is inspect._empty:
+                    if parameter.default is inspect._empty:
+                        self._quit(error_message="Could not retrieve a type for parameter {}".format(parameter.name))
+                    else:
+                        parameter_type = type(parameter.default)
 
                 # prevent that the parameter name equals an existing class variable, prepend them with 'entry_'
                 param_entry_name = 'entry_{}'.format(parameter.name)
-                self.entries.append((parameter.name, param_entry_name, parameter.annotation))
+                self.entries.append((parameter.name, param_entry_name, parameter_type))
 
-                setattr(self, param_entry_name, Gtk.Entry(text=str(parameter.default)))
+                if parameter_type is bool:
+                    # for booleans, show a checkbutton, only set it to checked if the default value was (exactly) True
+                    entry = Gtk.CheckButton()
+                    entry.set_active(True if parameter.default is True else False)
+                else:
+                    # for all other types, show a text entry
+                    entry = Gtk.Entry(text=str(parameter.default))
+                setattr(self, param_entry_name, entry)
+
+                label = Gtk.Label(label=parameter.name, halign=Gtk.Align.END)
                 grid.attach(label, left=0, top=row_index, width=2, height=1)
                 grid.attach_next_to(getattr(self, param_entry_name), sibling=label, side=Gtk.PositionType.RIGHT,
                                     width=2, height=1)
@@ -113,7 +127,10 @@ class EntryWindow(Gtk.Window):
         input_values = {}
         for param_name, param_entry_name, param_type in self.entries:
             try:
-                user_input = getattr(self, param_entry_name).get_text()
+                if param_type is bool:
+                    user_input = getattr(self, param_entry_name).get_active()
+                else:
+                    user_input = getattr(self, param_entry_name).get_text()
                 input_values[param_name] = param_type(user_input)
             except Exception as e:
                 self._quit(error_message='Wrong user input {} for the field {}'.format(user_input, param_name))
@@ -161,3 +178,4 @@ def launch_entry_window(method):
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()
+
