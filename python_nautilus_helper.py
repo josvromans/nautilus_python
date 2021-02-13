@@ -1,7 +1,8 @@
+import glob
 import inspect
 import logging
 import os
-import glob
+import sys
 
 
 # do the logging at the script location (most likely .local/share/nautilus/scripts)
@@ -15,8 +16,8 @@ try:
     import gi
     gi.require_version("Gtk", "3.0")
     from gi.repository import Gtk
-except Exception as e:
-    logging.error(e)
+except Exception as err:
+    logging.error(str(err))
 
 
 PATH_PARAMETERS = ['file_path', 'file_paths', 'directory_path', 'directory_paths']
@@ -50,7 +51,10 @@ class EntryWindow(Gtk.Window):
                 parameter_type = parameter.annotation
                 if parameter_type is inspect._empty:
                     if parameter.default is inspect._empty:
-                        self._quit(error_message="Could not retrieve a type for parameter {}".format(parameter.name))
+                        self._quit_with_error_dialog(
+                            error_message="Could not retrieve a type for parameter {}".format(parameter.name)
+                        )
+                        sys.exit()
                     else:
                         parameter_type = type(parameter.default)
 
@@ -74,8 +78,10 @@ class EntryWindow(Gtk.Window):
                 row_index += 1
 
         if len(file_parameters) != 1:
-            self._quit(error_message="The method should have exactly one parameter from {}".format(PATH_PARAMETERS))
-            return
+            self._quit_with_error_dialog(error_title="The method should have exactly one of the following paramters:",
+                                         error_message=str(PATH_PARAMETERS))
+            sys.exit()
+
         self.method_file_parameter = file_parameters[0]
 
         self.cancel_button = Gtk.Button.new_with_mnemonic('cancel')
@@ -108,13 +114,27 @@ class EntryWindow(Gtk.Window):
                     fraction=(process_number + 1) / total_processes,
                     text='{} / {} done'.format(process_number + 1, total_processes))
         except Exception as e:
-            logging.error(e)
+            self._quit_with_error_dialog(error_message=str(e))
 
-    def _quit(self, error_message=None):
-        if error_message is not None:
-            logging.error(error_message)
-
+    def _quit(self, *args, **kwargs):
         Gtk.main_quit()
+
+    def _quit_with_error_dialog(self, error_message, error_title=None):
+        """
+        Show a dialog with the error message. After the user clicks on ok, the application quits.
+        """
+        dialog = Gtk.MessageDialog(
+            transient_for=self,
+            flags=0,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.CLOSE,
+            text=error_title or 'ERROR',
+        )
+        dialog.format_secondary_text(error_message)
+        dialog.connect("response", self._quit)
+        dialog.run()
+        dialog.destroy()
+        logging.error('{} {}'.format(error_title or '', error_message))
 
     def on_submit(self, button):
         """
@@ -149,14 +169,18 @@ class EntryWindow(Gtk.Window):
                     user_input = getattr(self, param_entry_name).get_text()
                 input_values[param_name] = param_type(user_input)
             except Exception as e:
-                self._quit(error_message='Wrong user input for the field {}'.format(param_name))
+                self._quit_with_error_dialog(
+                    error_title="Wrong user input for the field '{}'".format(param_name),
+                    error_message=str(e))
+                return
 
         # If the file_paths variable is not in the environment, quit and log the error.
         # In case the code is not run via a nautilus menu, it will fail on the line below it, and the user
         # will see the error in his command line
         if 'NAUTILUS_SCRIPT_SELECTED_FILE_PATHS' not in os.environ:
-            self._quit(error_message="NAUTILUS_SCRIPT_SELECTED_FILE_PATHS is not in os.environ. "
-                                     "Did you run this code via a nautilus menu?")
+            self._quit_with_error_dialog(
+                error_title="NAUTILUS_SCRIPT_SELECTED_FILE_PATHS is not in os.environ.",
+                error_message="Did you run this code via a nautilus menu?")
 
         # the list of file paths that the user selected in Nautilus
         nautilus_file_paths = os.environ['NAUTILUS_SCRIPT_SELECTED_FILE_PATHS'].splitlines()
@@ -185,7 +209,8 @@ class EntryWindow(Gtk.Window):
             self._call_method(kwargs=input_values)
 
         else:
-            self._quit(error_message='Method parameter {} was not recognised'.format(self.method_file_parameter))
+            self._quit_with_error_dialog(
+                error_message='Method parameter {} was not recognised'.format(self.method_file_parameter))
 
         self._quit()
 
