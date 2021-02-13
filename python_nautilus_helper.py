@@ -58,10 +58,9 @@ class EntryWindow(Gtk.Window):
                 param_entry_name = 'entry_{}'.format(parameter.name)
                 self.entries.append((parameter.name, param_entry_name, parameter_type))
 
-                if parameter_type is bool:
-                    # for booleans, show a checkbutton, only set it to checked if the default value was (exactly) True
+                if parameter_type is bool:  # for booleans, show a checkbutton
                     entry = Gtk.CheckButton()
-                    entry.set_active(True if parameter.default is True else False)
+                    entry.set_active(is_active=parameter.default is True)  # False for any value other then exactly True
                 else:
                     # for all other types, show a text entry
                     entry = Gtk.Entry(text=str(parameter.default))
@@ -79,18 +78,35 @@ class EntryWindow(Gtk.Window):
             return
         self.method_file_parameter = file_parameters[0]
 
-        cancel_button = Gtk.Button.new_with_mnemonic('cancel')
-        cancel_button.connect("clicked", self._quit)
-        submit_button = Gtk.Button.new_with_mnemonic(self.method.__name__)
-        submit_button.connect("clicked", self.on_submit)
+        self.cancel_button = Gtk.Button.new_with_mnemonic('cancel')
+        self.cancel_button.connect("clicked", self._quit)
+        self.submit_button = Gtk.Button.new_with_mnemonic(self.method.__name__)
+        self.submit_button.connect("clicked", self.on_submit)
 
-        grid.attach(cancel_button, 0, row_index, 2, 1)
-        grid.attach(submit_button, 2, row_index, 2, 1)
+        grid.attach(self.cancel_button, 0, row_index, 2, 1)
+        grid.attach(self.submit_button, 2, row_index, 2, 1)
 
-    def _call_method(self, kwargs):
+        self.progressbar = Gtk.ProgressBar(show_text=True)
+        grid.attach(self.progressbar, 0, row_index + 1, 4, 1)
+
+    def update_progress_bar(self, fraction, text):
+        self.progressbar.set_fraction(fraction)
+        self.progressbar.set_text(text)
+
+        while Gtk.events_pending():
+            Gtk.main_iteration()
+
+    def _call_method(self, kwargs, process_number=0, total_processes=1):
         try:
             logging.debug('Running method {} with {}'.format(self.method.__name__, kwargs))
+            self.cancel_button.set_sensitive(False)
+            self.submit_button.set_sensitive(False)
+
             self.method(**kwargs)
+            if total_processes > 0:
+                self.update_progress_bar(
+                    fraction=(process_number + 1) / total_processes,
+                    text='{} / {} done'.format(process_number + 1, total_processes))
         except Exception as e:
             logging.error(e)
 
@@ -133,7 +149,7 @@ class EntryWindow(Gtk.Window):
                     user_input = getattr(self, param_entry_name).get_text()
                 input_values[param_name] = param_type(user_input)
             except Exception as e:
-                self._quit(error_message='Wrong user input {} for the field {}'.format(user_input, param_name))
+                self._quit(error_message='Wrong user input for the field {}'.format(param_name))
 
         # If the file_paths variable is not in the environment, quit and log the error.
         # In case the code is not run via a nautilus menu, it will fail on the line below it, and the user
@@ -158,9 +174,10 @@ class EntryWindow(Gtk.Window):
 
         # When the method expects one single path, but the user selected multiple paths, call the method for every path
         if self.method_file_parameter in ['file_path', 'directory_path']:
-            for file_path in nautilus_file_paths:
+            total_processes = len(nautilus_file_paths)
+            for process_index, file_path in enumerate(nautilus_file_paths):
                 input_values[self.method_file_parameter] = file_path
-                self._call_method(kwargs=input_values)
+                self._call_method(kwargs=input_values, process_number=process_index, total_processes=total_processes)
 
         # When the method expects several paths, call the method once with the list of paths
         elif self.method_file_parameter in ['file_paths', 'directory_paths']:
@@ -178,4 +195,3 @@ def launch_entry_window(method):
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
     Gtk.main()
-
