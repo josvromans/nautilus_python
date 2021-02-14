@@ -12,8 +12,8 @@ This is made to quickly convert existing Python functionality to a Nautilus menu
 In the images below you can see how the parameters from a Python method are shown in a window that is accessible from Nautilus. 
 
 ![Python method code](code.png)
-![Screenshot of Nautilus menu](nautilus_menu.png)
 ![Gtk window](gtk_window.png)
+![Screenshot of Nautilus menu](nautilus_menu.png)
 
 Method requirements
 ===================
