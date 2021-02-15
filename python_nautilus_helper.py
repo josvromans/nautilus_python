@@ -48,6 +48,8 @@ class EntryWindow(Gtk.Window):
 
         self.method = method
         self.color_parameters = getattr(method, 'color_parameters', [])
+        self.combo_choices = getattr(method, 'combo_choices', {})
+        self.check_combo_choices()
 
         grid = Gtk.Grid(column_homogeneous=True, column_spacing=10, row_spacing=10)
         self.add(grid)
@@ -72,8 +74,11 @@ class EntryWindow(Gtk.Window):
                 # prevent that the parameter name equals an existing class variable, prepend them with 'entry_'
                 param_entry_name = 'entry_{}'.format(parameter.name)
 
-                # booleans will become checkboxes, color tuples will become a 'ColorChooser', all others: normal inputs
-                if parameter_type is bool:  # for booleans, show a checkbutton
+                # Determine how the parameter should show up. If it is a boolean, a checkbox will be rendered.
+                # If it is a color, render a ColorButton (parameter name has to be added to method.color_parameter)
+                # If a list of multiple choices is defined in method.combo_choices, render a ComboBox
+                # For all other values, render a 'normal' text Entry
+                if parameter_type is bool:
                     entry = Gtk.CheckButton()
                     entry.set_active(is_active=parameter.default is True)  # False for any value other then exactly True
                     user_input_getter = 'get_active'
@@ -89,6 +94,18 @@ class EntryWindow(Gtk.Window):
                     color = Gdk.RGBA(*default_color)  # default_color is a 4 tuple of rgba values
                     entry.set_rgba(color)
                     user_input_getter = 'get_rgb_int_tuple'
+                elif parameter.name in self.combo_choices:
+                    entry = Gtk.ComboBoxText()
+                    default_index = 0
+                    for choice_index, choice in enumerate(self.combo_choices[parameter.name]):
+                        # only a string can be added here. If the parameter is not a string, it will be converted to
+                        # the correct type later, with the 'parameter_type' that has been determined above
+                        entry.append_text(str(choice))
+                        if choice == parameter.default:
+                            default_index = choice_index
+
+                    entry.set_active(default_index)
+                    user_input_getter = 'get_active_text'
                 else:
                     # for all other types, show a text entry
                     entry = Gtk.Entry(text=str(parameter.default))
@@ -121,6 +138,13 @@ class EntryWindow(Gtk.Window):
 
         self.progressbar = Gtk.ProgressBar(show_text=True)
         grid.attach(self.progressbar, 0, row_index + 1, 4, 1)
+
+    def check_combo_choices(self):
+        if not isinstance(self.combo_choices, dict) or \
+                any(not isinstance(value, (list, tuple)) for value in self.combo_choices.values()):
+            self._quit_with_error_dialog(error_title='method.combo_choices is not correct',
+                                         error_message="It should be a dict like {'param_name': ['val1', 'val2']}")
+            sys.exit()
 
     def update_progress_bar(self, fraction, text):
         self.progressbar.set_fraction(fraction)
