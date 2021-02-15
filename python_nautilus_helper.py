@@ -24,6 +24,15 @@ except Exception as err:
 PATH_PARAMETERS = ['file_path', 'file_paths', 'directory_path', 'directory_paths']
 
 
+class ColorButton(Gtk.ColorButton):
+    """
+    Gtk.ColorButton has methods like 'to_string', but I could not find one that returns a tuple of integers.
+    'get_rgb_int_tuple' is made to return the color in such way that it is compatible with Pillow
+    """
+    def get_rgb_int_tuple(self):
+        return tuple([int(value * 255) for value in self.get_rgba()])
+
+
 class EntryWindow(Gtk.Window):
     def __init__(self, method):
         """
@@ -43,8 +52,8 @@ class EntryWindow(Gtk.Window):
         grid = Gtk.Grid(column_homogeneous=True, column_spacing=10, row_spacing=10)
         self.add(grid)
 
-        self.entries = []
-        file_parameters = []  # collect them, later check if there is exactly one
+        self.entries = []  # collect for every parameter the name, type and how the user input can be retrieved
+        file_parameters = []  # collect which parameter defines the selected files, later check if there is exactly one
         row_index = 0
         for parameter in inspect.signature(method).parameters.values():
             if parameter.name in PATH_PARAMETERS:
@@ -62,12 +71,12 @@ class EntryWindow(Gtk.Window):
 
                 # prevent that the parameter name equals an existing class variable, prepend them with 'entry_'
                 param_entry_name = 'entry_{}'.format(parameter.name)
-                self.entries.append((parameter.name, param_entry_name, parameter_type))
 
                 # booleans will become checkboxes, color tuples will become a 'ColorChooser', all others: normal inputs
                 if parameter_type is bool:  # for booleans, show a checkbutton
                     entry = Gtk.CheckButton()
                     entry.set_active(is_active=parameter.default is True)  # False for any value other then exactly True
+                    user_input_getter = 'get_active'
                 elif parameter.name in self.color_parameters:
                     if isinstance(parameter.default, tuple) and len(parameter.default) in (3, 4):
                         default_color = parameter.default
@@ -76,13 +85,17 @@ class EntryWindow(Gtk.Window):
                     else:
                         default_color = (255, 255, 255, 1)
 
-                    entry = Gtk.ColorButton()
+                    entry = ColorButton()
                     color = Gdk.RGBA(*default_color)  # default_color is a 4 tuple of rgba values
                     entry.set_rgba(color)
+                    user_input_getter = 'get_rgb_int_tuple'
                 else:
                     # for all other types, show a text entry
                     entry = Gtk.Entry(text=str(parameter.default))
+                    user_input_getter = 'get_text'
                 setattr(self, param_entry_name, entry)
+
+                self.entries.append((parameter.name, param_entry_name, parameter_type, user_input_getter))
 
                 label = Gtk.Label(label=parameter.name, halign=Gtk.Align.END)
                 grid.attach(label, left=0, top=row_index, width=2, height=1)
@@ -174,17 +187,11 @@ class EntryWindow(Gtk.Window):
             - a single 'directory_path': call the method for every path directory path in the list.
             - several 'directory_paths': call the method once for the list of directory paths.
         """
-        input_values = {}
-        for param_name, param_entry_name, param_type in self.entries:
+        user_inputs = {}
+        for param_name, param_entry_name, param_type, user_input_getter in self.entries:
             try:
-                if param_type is bool:
-                    user_input = getattr(self, param_entry_name).get_active()
-                elif param_name in self.color_parameters:
-                    gdk_rgb = getattr(self, param_entry_name).get_rgba()
-                    user_input = tuple([int(value * 255) for value in (gdk_rgb.red, gdk_rgb.green, gdk_rgb.blue)])
-                else:
-                    user_input = getattr(self, param_entry_name).get_text()
-                input_values[param_name] = param_type(user_input)
+                user_input = getattr(getattr(self, param_entry_name), user_input_getter)()
+                user_inputs[param_name] = param_type(user_input)
             except Exception as e:
                 self._quit_with_error_dialog(
                     error_title="Wrong user input for the field '{}'".format(param_name),
@@ -217,13 +224,13 @@ class EntryWindow(Gtk.Window):
         if self.method_file_parameter in ['file_path', 'directory_path']:
             total_processes = len(nautilus_file_paths)
             for process_index, file_path in enumerate(nautilus_file_paths):
-                input_values[self.method_file_parameter] = file_path
-                self._call_method(kwargs=input_values, process_number=process_index, total_processes=total_processes)
+                user_inputs[self.method_file_parameter] = file_path
+                self._call_method(kwargs=user_inputs, process_number=process_index, total_processes=total_processes)
 
         # When the method expects several paths, call the method once with the list of paths
         elif self.method_file_parameter in ['file_paths', 'directory_paths']:
-            input_values[self.method_file_parameter] = nautilus_file_paths
-            self._call_method(kwargs=input_values)
+            user_inputs[self.method_file_parameter] = nautilus_file_paths
+            self._call_method(kwargs=user_inputs)
 
         else:
             self._quit_with_error_dialog(
