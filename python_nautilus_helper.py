@@ -16,6 +16,7 @@ try:
     import gi
     gi.require_version("Gtk", "3.0")
     from gi.repository import Gtk
+    from gi.repository import Gdk
 except Exception as err:
     logging.error(str(err))
 
@@ -37,6 +38,7 @@ class EntryWindow(Gtk.Window):
         Gtk.Window.__init__(self, title=method.__name__)
 
         self.method = method
+        self.color_parameters = getattr(method, 'color_parameters', [])
 
         grid = Gtk.Grid(column_homogeneous=True, column_spacing=10, row_spacing=10)
         self.add(grid)
@@ -62,9 +64,21 @@ class EntryWindow(Gtk.Window):
                 param_entry_name = 'entry_{}'.format(parameter.name)
                 self.entries.append((parameter.name, param_entry_name, parameter_type))
 
+                # booleans will become checkboxes, color tuples will become a 'ColorChooser', all others: normal inputs
                 if parameter_type is bool:  # for booleans, show a checkbutton
                     entry = Gtk.CheckButton()
                     entry.set_active(is_active=parameter.default is True)  # False for any value other then exactly True
+                elif parameter.name in self.color_parameters:
+                    if isinstance(parameter.default, tuple) and len(parameter.default) in (3, 4):
+                        default_color = parameter.default
+                        if len(default_color) == 3:
+                            default_color += (1, )  # add the alpha channel just in case
+                    else:
+                        default_color = (255, 255, 255, 1)
+
+                    entry = Gtk.ColorButton()
+                    color = Gdk.RGBA(*default_color)  # default_color is a 4 tuple of rgba values
+                    entry.set_rgba(color)
                 else:
                     # for all other types, show a text entry
                     entry = Gtk.Entry(text=str(parameter.default))
@@ -165,6 +179,9 @@ class EntryWindow(Gtk.Window):
             try:
                 if param_type is bool:
                     user_input = getattr(self, param_entry_name).get_active()
+                elif param_name in self.color_parameters:
+                    gdk_rgb = getattr(self, param_entry_name).get_rgba()
+                    user_input = tuple([int(value * 255) for value in (gdk_rgb.red, gdk_rgb.green, gdk_rgb.blue)])
                 else:
                     user_input = getattr(self, param_entry_name).get_text()
                 input_values[param_name] = param_type(user_input)

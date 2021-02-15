@@ -53,7 +53,8 @@ Use ```as method```, since that is the name the code below expects.
    * d) In case you custom Python method only uses Python standard libraries, you can delete or comment line 6. 
    In case you have an environment set up, you have to add the path to those 'site_packages' as well.
    
-4) Make ```custom_method_template.py``` executable. If you renamed it to ```make_movie.py``` you can call
+4) ```custom_method_template.py``` should already be executable, so probably you don't have to do anything. 
+   But if it is not, and you renamed it to ```make_movie.py``` you can call
 
    ```chmod +x make_movie.py```
    
