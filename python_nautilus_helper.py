@@ -139,6 +139,12 @@ class EntryWindow(Gtk.Window):
         self.progressbar = Gtk.ProgressBar(show_text=True)
         grid.attach(self.progressbar, 0, row_index + 1, 4, 1)
 
+        self.doc_string = inspect.getdoc(method)
+        if self.doc_string:
+            self.info_button = Gtk.Button.new_with_mnemonic('info')
+            self.info_button.connect("clicked", self.info_cb)
+            grid.attach(self.info_button, 0, row_index + 2, 1, 1)
+
     def check_combo_choices(self):
         if not isinstance(self.combo_choices, dict) or \
                 any(not isinstance(value, (list, tuple)) for value in self.combo_choices.values()):
@@ -261,6 +267,13 @@ class EntryWindow(Gtk.Window):
                 error_message='Method parameter {} was not recognised'.format(self.method_file_parameter))
 
         self._quit()
+
+    def info_cb(self, action):
+        Gtk.AboutDialog(
+            program_name=self.method.__name__,
+            copyright=self.doc_string,
+            logo_icon_name=None,
+        ).show()
 
 
 def launch_entry_window(method):

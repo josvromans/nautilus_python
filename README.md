@@ -85,9 +85,7 @@ Any code change in your Project will be directly available when you right click 
 Improvements
 ============
 python gtk could be replaced by Tkinter, which is in the standard library, and thus makes installing the first requirement obsolete.
-For extending functionality, Gtk is a good choice. You could for example change the Nautilus window appearance. 
-
-Allow multiple choice variables, so instead of 'open input fields', the user can only choose from a set of predefined options.
+For extending functionality, Gtk is a good choice. You could for example change the Nautilus window appearance.
 
 Allow methods that specify file formats. 
 For example if a method has a 'jpeg_file_path' or 'jpeg_file_paths' parameter, parse the first part as a file extension.
