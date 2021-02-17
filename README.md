@@ -15,6 +15,13 @@ In the images below you can see how the parameters from a Python method are show
 ![Gtk window](gtk_window.png)
 ![Screenshot of Nautilus menu](nautilus_menu.png)
 
+Since this works with a linked path, you don't have to re-build an application or restart Nautilus. 
+Any code change in your Project will be directly available when you right click on a file and launch the script again. This is useful while developing.
+
+The Nautilus approach is also very practical since you can apply an action to any single file or any file in a directory by just selecting it.
+When selecting some files (not all) in a directory, this is definitely more practical than providing several specific paths in a command line tool.
+
+
 Method requirements
 ===================
 The Python method should have exactly one of the following parameters: 
@@ -78,9 +85,6 @@ They can be easily attached to nautilus with a simple bash script. So when you d
 
 Copying a file will copy the execute permission. So if you have ```make_movie.py``` set up and want to add another functionality, the fastest is to copy that file, so you don't have to call ```chmod``` again.
 
-Since this works with a linked path, you don't have to re-build an application or restart Nautilus. 
-Any code change in your Project will be directly available when you right click on a file and launch the script again. This is useful while developing. 
-
 
 Improvements
 ============
@@ -99,7 +103,34 @@ and then use that as
 
 python_file_operations
 ======================
-I added a collection of file operations in this repo. All of them can be made available in Nautilus with the described method.
+I added a collection of file operations in this repo: 
+https://github.com/josvromans/python_file_operations
+
+All of them can be made available in Nautilus with the described method.
 As said before, some of these can work easier (and faster) with command line tools. 
-However, the Python approach can still be useful if Python is your tool of choice to customize anything you want (in the functionality and the appearance in the input window). 
-Any methods from this repository can of course also be copied in your project, if it is exactly the functionality you need.  
+However, the Python approach can still be useful if Python is your tool of choice to customize anything you want 
+(in the functionality, and the appearance in the input window).
+Any methods from this repository can of course also be copied in your project.
+The methods include the following:
+
+* File operations
+- prefix_filename
+- postfix_filename
+- split_large_folder (for example in subdirectories of 100 files)
+- weed_out_files
+- make_filename_unrecognizable (convert filenames to an unreadable hash string)
+- number_filenames
+- sort_files_by_size
+
+* Image operations
+- resize_image
+- add_margin
+- crop_image_in_equal_parts
+- paste_image_in_center
+- crop_center
+- apply_filter (all PIL ImageFilters)
+- image_difference
+
+* vide operations
+- make movie (from a directory of image files)
+- merge videos (take two or more video files, and past them to one final video file)
